@@ -22,6 +22,7 @@ from bidexhands.tasks.shadow_hand_grasp_and_place import ShadowHandGraspAndPlace
 from bidexhands.tasks.shadow_hand_scissors import ShadowHandScissors
 from bidexhands.tasks.shadow_hand_switch import ShadowHandSwitch
 from bidexhands.tasks.shadow_hand_pen import ShadowHandPen
+from bidexhands.tasks.shadow_hand_pen_left import ShadowHandPenLeft
 from bidexhands.tasks.shadow_hand_re_orientation import ShadowHandReOrientation
 from bidexhands.tasks.shadow_hand_kettle import ShadowHandKettle
 from bidexhands.tasks.shadow_hand_block_stack import ShadowHandBlockStack
