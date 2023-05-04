@@ -289,6 +289,8 @@ class ShadowHandPenLeft(BaseTask):
         asset_root = "../../assets"
         shadow_hand_asset_file = "mjcf/open_ai_assets/hand/shadow_hand.xml"
         shadow_hand_another_asset_file = "mjcf/open_ai_assets/hand/shadow_hand1.xml"
+        shadow_hand_left_asset_file = "mjcf/open_ai_assets/hand/shadow_hand_left.xml"
+        
         table_texture_files = "../assets/textures/texture_stone_stone_texture_0.jpg"
         table_texture_handle = self.gym.create_texture_from_file(self.sim, table_texture_files)
 
@@ -315,7 +317,7 @@ class ShadowHandPenLeft(BaseTask):
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
 
         shadow_hand_asset = self.gym.load_asset(self.sim, asset_root, shadow_hand_asset_file, asset_options)
-        shadow_hand_another_asset = self.gym.load_asset(self.sim, asset_root, shadow_hand_another_asset_file, asset_options)
+        shadow_hand_another_asset = self.gym.load_asset(self.sim, asset_root, shadow_hand_left_asset_file, asset_options)
 
         self.num_shadow_hand_bodies = self.gym.get_asset_rigid_body_count(shadow_hand_asset)
         self.num_shadow_hand_shapes = self.gym.get_asset_rigid_shape_count(shadow_hand_asset)
@@ -418,15 +420,15 @@ class ShadowHandPenLeft(BaseTask):
 
         shadow_hand_start_pose = gymapi.Transform()
         shadow_hand_start_pose.p = gymapi.Vec3(0.55, 0.2, 0.8)
-        shadow_hand_start_pose.r = gymapi.Quat().from_euler_zyx(3.14159, 0, 1.57)
+        shadow_hand_start_pose.r = gymapi.Quat.from_euler_zyx(3.14159, 0, 1.57)
 
         shadow_another_hand_start_pose = gymapi.Transform()
         shadow_another_hand_start_pose.p = gymapi.Vec3(0.55, -0.2, 0.8)
-        shadow_another_hand_start_pose.r = gymapi.Quat().from_euler_zyx(3.14159, 0, 1.57)
+        shadow_another_hand_start_pose.r = gymapi.Quat.from_euler_zyx(0, 0, -1.57)
 
         object_start_pose = gymapi.Transform()
         object_start_pose.p = gymapi.Vec3(0.0, 0., 0.6)
-        object_start_pose.r = gymapi.Quat().from_euler_zyx(1.57, 1.57, 0)
+        object_start_pose.r = gymapi.Quat.from_euler_zyx(1.57, 1.57, 0)
         pose_dx, pose_dy, pose_dz = -1.0, 0.0, -0.0
 
         # object_start_pose.p.x = shadow_hand_start_pose.p.x + pose_dx
@@ -446,7 +448,7 @@ class ShadowHandPenLeft(BaseTask):
 
         table_pose = gymapi.Transform()
         table_pose.p = gymapi.Vec3(0.0, 0.0, 0.5 * table_dims.z)
-        table_pose.r = gymapi.Quat().from_euler_zyx(-0., 0, 0)
+        table_pose.r = gymapi.Quat.from_euler_zyx(-0., 0, 0)
 
         # compute aggregate size
         max_agg_bodies = self.num_shadow_hand_bodies * 2 + 2 * self.num_object_bodies + 1
