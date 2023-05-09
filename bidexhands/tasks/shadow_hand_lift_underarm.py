@@ -387,10 +387,8 @@ class ShadowHandLiftUnderarm(BaseTask):
         asset_options.collapse_fixed_joints = True
         asset_options.disable_gravity = True
         asset_options.thickness = 0.001
-        # asset_options.angular_damping = 100
-        # asset_options.linear_damping = 100
-        asset_options.angular_damping = 0.01
-        asset_options.linear_damping = 0.01
+        asset_options.angular_damping = 0.1
+        asset_options.linear_damping = 0.1
 
         if self.physics_engine == gymapi.SIM_PHYSX:
             asset_options.use_physx_armature = True
@@ -467,6 +465,113 @@ class ShadowHandLiftUnderarm(BaseTask):
         dof_props_left = self.gym.get_asset_dof_properties(shadow_hand_left_asset)
         dof_props_right = self.gym.get_asset_dof_properties(shadow_hand_right_asset)
 
+        # effort, lower, upper, velocity, damping (hand) load from urdf
+        # damping (arm), stiffness (arm) set to the values in IsaacSim
+        # stiffness (hand) set to 3.0 (approximate value)
+        # TODO: check the stiffness values with UK team
+        default_dof_props_left = {
+            "shoulder_pan_joint": {'effort': 330.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 2.0943951023931953, 'damping': 34.90659, 'stiffness': 349.06589},
+            "shoulder_lift_joint": {'effort': 330.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 2.0943951023931953, 'damping': 34.90659, 'stiffness': 349.06589},
+            "elbow_joint": {'effort': 150.0, 'lower': -3.141592653589793, 'upper': 3.141592653589793, 'velocity': 3.141592653589793, 'damping': 34.90659, 'stiffness': 349.06589},
+            "wrist_1_joint": {'effort': 56.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 3.141592653589793, 'damping': 34.90659, 'stiffness': 349.06589},
+            "wrist_2_joint": {'effort': 56.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 3.141592653589793, 'damping': 34.90659, 'stiffness': 349.06589},
+            "wrist_3_joint": {'effort': 56.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 3.141592653589793, 'damping': 34.90659, 'stiffness': 349.06589},
+            "lh_WRJ2": {'effort': 10.0, 'lower': -0.5235987755982988, 'upper': 0.17453292519943295, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_WRJ1": {'effort': 30.0, 'lower': -0.6981317007977318, 'upper': 0.4886921905584123, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_FFJ4": {'effort': 2.0, 'lower': -0.3490658503988659, 'upper': 0.3490658503988659, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_FFJ3": {'effort': 2.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_FFJ2": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_FFJ1": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_MFJ4": {'effort': 2.0, 'lower': -0.3490658503988659, 'upper': 0.3490658503988659, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_MFJ3": {'effort': 2.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_MFJ2": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_MFJ1": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_RFJ4": {'effort': 2.0, 'lower': -0.3490658503988659, 'upper': 0.3490658503988659, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_RFJ3": {'effort': 2.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_RFJ2": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_RFJ1": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_LFJ5": {'effort': 2.0, 'lower': 0.0, 'upper': 0.7853981633974483, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_LFJ4": {'effort': 2.0, 'lower': -0.3490658503988659, 'upper': 0.3490658503988659, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_LFJ3": {'effort': 2.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_LFJ2": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_LFJ1": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_THJ5": {'effort': 5.0, 'lower': -1.0471975511965976, 'upper': 1.0471975511965976, 'velocity': 4.0, 'damping': 0.2, 'stiffness': 3.0},
+            "lh_THJ4": {'effort': 3.0, 'lower': 0.0, 'upper': 1.2217304763960306, 'velocity': 4.0, 'damping': 0.2, 'stiffness': 3.0},
+            "lh_THJ3": {'effort': 2.0, 'lower': -0.20943951023931953, 'upper': 0.20943951023931953, 'velocity': 4.0, 'damping': 0.2, 'stiffness': 3.0},
+            "lh_THJ2": {'effort': 2.0, 'lower': -0.6981317007977318, 'upper': 0.6981317007977318, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "lh_THJ1": {'effort': 1.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 4.0, 'damping': 0.2, 'stiffness': 3.0},
+        }
+        
+        default_dof_props_right = {
+            "shoulder_pan_joint": {'effort': 330.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 2.0943951023931953, 'damping': 34.90659, 'stiffness': 349.06589},
+            "shoulder_lift_joint": {'effort': 330.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 2.0943951023931953, 'damping': 34.90659, 'stiffness': 349.06589},
+            "elbow_joint": {'effort': 150.0, 'lower': -3.141592653589793, 'upper': 3.141592653589793, 'velocity': 3.141592653589793, 'damping': 34.90659, 'stiffness': 349.06589},
+            "wrist_1_joint": {'effort': 56.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 3.141592653589793, 'damping': 34.90659, 'stiffness': 349.06589},
+            "wrist_2_joint": {'effort': 56.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 3.141592653589793, 'damping': 34.90659, 'stiffness': 349.06589},
+            "wrist_3_joint": {'effort': 56.0, 'lower': -6.283185307179586, 'upper': 6.283185307179586, 'velocity': 3.141592653589793, 'damping': 34.90659, 'stiffness': 349.06589},
+            "rh_WRJ2": {'effort': 10.0, 'lower': -0.5235987755982988, 'upper': 0.17453292519943295, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_WRJ1": {'effort': 30.0, 'lower': -0.6981317007977318, 'upper': 0.4886921905584123, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_FFJ4": {'effort': 2.0, 'lower': -0.3490658503988659, 'upper': 0.3490658503988659, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_FFJ3": {'effort': 2.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_FFJ2": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_FFJ1": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_MFJ4": {'effort': 2.0, 'lower': -0.3490658503988659, 'upper': 0.3490658503988659, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_MFJ3": {'effort': 2.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_MFJ2": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_MFJ1": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_RFJ4": {'effort': 2.0, 'lower': -0.3490658503988659, 'upper': 0.3490658503988659, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_RFJ3": {'effort': 2.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_RFJ2": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_RFJ1": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_LFJ5": {'effort': 2.0, 'lower': 0.0, 'upper': 0.7853981633974483, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_LFJ4": {'effort': 2.0, 'lower': -0.3490658503988659, 'upper': 0.3490658503988659, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_LFJ3": {'effort': 2.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_LFJ2": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_LFJ1": {'effort': 2.0, 'lower': 0.0, 'upper': 1.5707963267948966, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_THJ5": {'effort': 5.0, 'lower': -1.0471975511965976, 'upper': 1.0471975511965976, 'velocity': 4.0, 'damping': 0.2, 'stiffness': 3.0},
+            "rh_THJ4": {'effort': 3.0, 'lower': 0.0, 'upper': 1.2217304763960306, 'velocity': 4.0, 'damping': 0.2, 'stiffness': 3.0},
+            "rh_THJ3": {'effort': 2.0, 'lower': -0.20943951023931953, 'upper': 0.20943951023931953, 'velocity': 4.0, 'damping': 0.2, 'stiffness': 3.0},
+            "rh_THJ2": {'effort': 2.0, 'lower': -0.6981317007977318, 'upper': 0.6981317007977318, 'velocity': 2.0, 'damping': 0.1, 'stiffness': 3.0},
+            "rh_THJ1": {'effort': 1.0, 'lower': -0.2617993877991494, 'upper': 1.5707963267948966, 'velocity': 4.0, 'damping': 0.2, 'stiffness': 3.0},
+        }
+        
+        for name, props in default_dof_props_left.items():
+            index = self.gym.find_asset_dof_index(shadow_hand_left_asset, name)
+            dof_props_left["driveMode"] = gymapi.DofDriveMode.DOF_MODE_POS
+            for key, value in props.items():
+                print(name, key, index, value)
+                dof_props_left[key][index] = value
+                
+        for name, props in default_dof_props_right.items():
+            index = self.gym.find_asset_dof_index(shadow_hand_right_asset, name)
+            dof_props_right["driveMode"] = gymapi.DofDriveMode.DOF_MODE_POS
+            for key, value in props.items():
+                dof_props_right[key][index] = value
+        
+        # # WARNING: the following properties are estimated
+        # # TODO: replace those properties with the real ones
+        # for i in range(self.num_shadow_hand_dofs):
+        #     dof_props_left["stiffness"][i] = 3
+        #     dof_props_left["driveMode"][i] = gymapi.DofDriveMode.DOF_MODE_POS
+        #     dof_props_left["velocity"][i] = 10
+        #     dof_props_left["damping"][i] = 0.1
+        #     dof_props_left['effort'][i] = 0.5
+        #     dof_props_right["stiffness"][i] = 3
+        #     dof_props_right["driveMode"][i] = gymapi.DofDriveMode.DOF_MODE_POS
+        #     dof_props_right["velocity"][i] = 10
+        #     dof_props_right["damping"][i] = 0.1
+        #     dof_props_right['effort'][i] = 0.5
+        
+        # for i in range(0, 6):
+        #     dof_props_left['stiffness'][i] = 400
+        #     dof_props_left['damping'][i] = 80
+        #     dof_props_left['effort'][i] = 200
+        #     dof_props_right['stiffness'][i] = 400
+        #     dof_props_right['damping'][i] = 80
+        #     dof_props_right['effort'][i] = 200
+            
+        print(dof_props_left)
+
         self.shadow_hand_dof_props_left = dof_props_left
         self.shadow_hand_dof_props_right = dof_props_right
         
@@ -474,7 +579,7 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.shadow_hand_dof_upper_limits = [dof_props_right["upper"][i] for i in range(self.num_shadow_hand_dofs)]
         self.shadow_hand_dof_init_positions = [0.0 for _ in range(self.num_shadow_hand_dofs)]
         self.shadow_hand_dof_init_velocities = [0.0 for _ in range(self.num_shadow_hand_dofs)]
-        
+
         # Set initial dof positions
         # TODO: set different initial positions for left and right hand
         for name, value in init_arm_dof_positions_left.items():
@@ -1039,7 +1144,6 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.shadow_hand_left_dof_velocities[env_ids, :] = self.shadow_hand_dof_init_velocities + noise * self.reset_dof_vel_noise
         self.shadow_hand_right_dof_velocities[env_ids, :] = self.shadow_hand_dof_init_velocities + noise * self.reset_dof_vel_noise
         
-        # TODO: replace [:self.num_shadow_hand_dofs] with absolute indices
         self.prev_targets[env_ids, self.shadow_hand_left_dof_start:self.shadow_hand_left_dof_end] = dof_init_positions
         self.cur_targets[env_ids, self.shadow_hand_left_dof_start:self.shadow_hand_left_dof_end] = dof_init_positions
 
@@ -1118,35 +1222,7 @@ class ShadowHandLiftUnderarm(BaseTask):
             self.reset(env_ids, goal_env_ids)
 
         self.actions = actions.clone().to(self.device)
-        # if self.use_relative_control:
-        #     targets = self.prev_targets[:, self.actuated_dof_indices] + self.shadow_hand_dof_speed_scale * self.dt * self.actions
-        #     self.cur_targets[:, self.actuated_dof_indices] = tensor_clamp(targets,
-        #                                                                   self.shadow_hand_dof_lower_limits[self.actuated_dof_indices], self.shadow_hand_dof_upper_limits[self.actuated_dof_indices])
-        # else:
-        #     self.cur_targets[:, self.actuated_dof_indices] = scale(self.actions[:, 6:26],
-        #                                                            self.shadow_hand_dof_lower_limits[self.actuated_dof_indices], self.shadow_hand_dof_upper_limits[self.actuated_dof_indices])
-        #     self.cur_targets[:, self.actuated_dof_indices] = self.act_moving_average * self.cur_targets[:,
-        #                                                                                                 self.actuated_dof_indices] + (1.0 - self.act_moving_average) * self.prev_targets[:, self.actuated_dof_indices]
-        #     self.cur_targets[:, self.actuated_dof_indices] = tensor_clamp(self.cur_targets[:, self.actuated_dof_indices],
-        #                                                                   self.shadow_hand_dof_lower_limits[self.actuated_dof_indices], self.shadow_hand_dof_upper_limits[self.actuated_dof_indices])
 
-        #     self.cur_targets[:, self.actuated_dof_indices + 24] = scale(self.actions[:, 32:52],
-        #                                                            self.shadow_hand_dof_lower_limits[self.actuated_dof_indices], self.shadow_hand_dof_upper_limits[self.actuated_dof_indices])
-        #     self.cur_targets[:, self.actuated_dof_indices + 24] = self.act_moving_average * self.cur_targets[:,
-        #                                                                                                 self.actuated_dof_indices + 24] + (1.0 - self.act_moving_average) * self.prev_targets[:, self.actuated_dof_indices]
-        #     self.cur_targets[:, self.actuated_dof_indices + 24] = tensor_clamp(self.cur_targets[:, self.actuated_dof_indices + 24],
-        #                                                                   self.shadow_hand_dof_lower_limits[self.actuated_dof_indices], self.shadow_hand_dof_upper_limits[self.actuated_dof_indices])
-            
-        #     # angle_offsets = self.actions[:, 26:32] * self.dt * self.orientation_scale
-
-            # TODO: understand those magic numbers
-        #     self.apply_forces[:, 1, :] = actions[:, 0:3] * self.dt * self.transition_scale * 100000
-        #     self.apply_forces[:, 1 + 26, :] = actions[:, 26:29] * self.dt * self.transition_scale * 100000
-        #     self.apply_torque[:, 1, :] = self.actions[:, 3:6] * self.dt * self.orientation_scale * 1000
-        #     self.apply_torque[:, 1 + 26, :] = self.actions[:, 29:32] * self.dt * self.orientation_scale * 1000   
-
-        #     self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.apply_forces), gymtorch.unwrap_tensor(self.apply_torque), gymapi.ENV_SPACE)
-        # print(self.actions)
         if self.use_relative_control:
             self.cur_targets[:, self.shadow_hand_actuated_dof_indices] = (
                 self.prev_targets[:, self.shadow_hand_actuated_dof_indices] 
