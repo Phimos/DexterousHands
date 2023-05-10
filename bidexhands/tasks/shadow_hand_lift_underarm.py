@@ -8,7 +8,7 @@
 from unittest import TextTestRunner
 from matplotlib.pyplot import axis
 from PIL import Image as Im
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import os
@@ -134,13 +134,6 @@ class ShadowHandLiftUnderarm(BaseTask):
                 "Unknown type of observations!\nobservationType should be one of: [point_cloud, full_state]")
 
         print("Obs type:", self.obs_type)
-
-        self.num_point_cloud_feature_dim = 768
-        self.num_obs_dict = {
-            "point_cloud": 417 + self.num_point_cloud_feature_dim * 3,
-            "point_cloud_for_distill": 417 + self.num_point_cloud_feature_dim * 3,
-            "full_state": 417
-        }
         
         self._parse_observation_and_action_space()
 
@@ -155,20 +148,6 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.use_vel_obs = False
         self.fingertip_obs = True
         self.asymmetric_obs = self.cfg["env"]["asymmetric_observations"]
-
-        num_states = 0
-        if self.asymmetric_obs:
-            num_states = 211
-
-        # self.cfg["env"]["numObservations"] = self.num_obs_dict[self.obs_type]
-        # self.cfg["env"]["numStates"] = num_states
-        # if self.is_multi_agent:
-        #     self.num_agents = 2
-        #     self.cfg["env"]["numActions"] = 26
-
-        # else:
-        #     self.num_agents = 1
-        #     self.cfg["env"]["numActions"] = 52
 
         self.cfg["device_type"] = device_type
         self.cfg["device_id"] = device_id
@@ -402,7 +381,13 @@ class ShadowHandLiftUnderarm(BaseTask):
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
         self.gym.add_ground(self.sim, plane_params)
 
-    def _display_dof_properties(self, asset, properties):
+    def _display_dof_properties(self, asset: gymapi.Asset, properties: np.ndarray):
+        """Displays the DoF properties of the asset in a rich table
+
+        Args:
+            asset (gymapi.Asset): IssacGym asset
+            properties (np.ndarray): DoF properties, stored in a structured array
+        """
         from rich.console import Console
         from rich.table import Table
         
@@ -673,14 +658,14 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.shadow_hand_left_center_asset_index = self.gym.find_asset_rigid_body_index(shadow_hand_left_asset, f"lh_{self.hand_center}")
         self.shadow_hand_right_center_asset_index = self.gym.find_asset_rigid_body_index(shadow_hand_right_asset, f"rh_{self.hand_center}")
 
-    def _random_colorize(self, env, shadow_hand_actor, shadow_hand_side: str, part_level: bool = False):
+    def _random_colorize(self, env: gymapi.Env, shadow_hand_actor: int, shadow_hand_side: str, part_level: bool = False):
         """Randomly colorize the shadow hand.
 
         Args:
-            env (_type_): _description_
-            shadow_hand_actor (_type_): _description_
-            shadow_hand_side (str): _description_
-            part_level (bool, optional): _description_. Defaults to False.
+            env (gymapi.Env): IsaacGym environment handle.
+            shadow_hand_actor (int): Shadow hand actor handle.
+            shadow_hand_side (str): Shadow hand side ("left" or "right").
+            part_level (bool, optional): Whether to colorize at part level. Defaults to False.
         """
         assert shadow_hand_side in ["left", "right"]
         prefix = "lh_" if shadow_hand_side == "left" else "rh_"
@@ -1100,6 +1085,7 @@ class ShadowHandLiftUnderarm(BaseTask):
             self.compute_full_state(True)
 
     def compute_full_state(self, asymm_obs=False):
+        # TODO: compute current full-state from observation space config
         shadow_hand_left_dof_positions = unscale(
             self.shadow_hand_left_dof_positions, 
             self.shadow_hand_dof_lower_limits, 
@@ -1143,7 +1129,7 @@ class ShadowHandLiftUnderarm(BaseTask):
             ],
             dim=-1,
         )
-        
+
     def compute_point_cloud_observation(self, collect_demonstration=False):
         pass
         
@@ -1234,10 +1220,6 @@ class ShadowHandLiftUnderarm(BaseTask):
 
         self.prev_targets[env_ids, self.shadow_hand_right_dof_start:self.shadow_hand_right_dof_end] = dof_init_positions
         self.cur_targets[env_ids, self.shadow_hand_right_dof_start:self.shadow_hand_right_dof_end] = dof_init_positions
-        
-        # print("self.num_shadow_hand_dofs", self.num_shadow_hand_dofs)
-        # print("prev_targets.shape", self.prev_targets.shape)
-        # print(self.dof_states.view(self.num_envs, self.num_dofs, 2)[:, self.shadow_hand_right_dof_indices, 0])
 
         indices = torch.unique(
             torch.cat(
