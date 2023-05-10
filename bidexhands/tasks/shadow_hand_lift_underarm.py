@@ -411,6 +411,26 @@ class ShadowHandLiftUnderarm(BaseTask):
         plane_params = gymapi.PlaneParams()
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
         self.gym.add_ground(self.sim, plane_params)
+
+    def _display_dof_properties(self, asset, properties):
+        from rich.console import Console
+        from rich.table import Table
+        
+        console = Console()
+        table = Table(show_header=True, header_style="bold magenta", title="DoF Properties")
+        table.add_column("Name")
+
+        columns = properties.dtype.names
+        
+        for column in columns:
+            table.add_column(column.capitalize())
+            
+        for i in range(properties.shape[0]):
+            name = self.gym.get_asset_dof_name(asset, i)
+            item = [name] + [str(properties[column][i]) for column in columns]
+            table.add_row(*item)
+
+        console.print(table)
         
     def _create_robots(self):
         asset_root = "../assets"
@@ -582,6 +602,8 @@ class ShadowHandLiftUnderarm(BaseTask):
             dof_props_right["driveMode"] = gymapi.DofDriveMode.DOF_MODE_POS
             for key, value in props.items():
                 dof_props_right[key][index] = value
+        
+        self._display_dof_properties(shadow_hand_left_asset, dof_props_left)
         
         # # WARNING: the following properties are estimated
         # # TODO: replace those properties with the real ones
