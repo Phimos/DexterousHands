@@ -9,6 +9,7 @@ from bidexhands.tasks.shadow_hand_over import ShadowHandOver
 from bidexhands.tasks.shadow_hand_catch_underarm import ShadowHandCatchUnderarm
 from bidexhands.tasks.shadow_hand_two_catch_underarm import ShadowHandTwoCatchUnderarm
 from bidexhands.tasks.shadow_hand_catch_abreast import ShadowHandCatchAbreast
+from bidexhands.tasks.shadow_hand_lift import ShadowHandLift
 from bidexhands.tasks.shadow_hand_lift_underarm import ShadowHandLiftUnderarm
 from bidexhands.tasks.shadow_hand_catch_over2underarm import ShadowHandCatchOver2Underarm
 from bidexhands.tasks.shadow_hand_door_close_inward import ShadowHandDoorCloseInward
