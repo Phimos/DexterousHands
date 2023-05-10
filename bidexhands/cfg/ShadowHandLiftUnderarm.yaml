@@ -2,7 +2,7 @@
 env: 
   env_name: "shadow_hand_lift_underarm"
   numEnvs: 128
-  envSpacing: 0.75
+  envSpacing: 1.5
   episodeLength: 500
   enableDebugVis: False
   cameraDebug: True
@@ -36,6 +36,38 @@ env:
 
   objectType: "pot" # can be block, egg or pen
   observationType: "full_state" # point_cloud or full_state
+  observationSpace:
+    - "shadow_hand_left_dof_position"
+    - "shadow_hand_left_dof_velocity"
+    - "shadow_hand_left_dof_force"
+    - "shadow_hand_left_fingertip_position"
+    - "shadow_hand_left_fingertip_orientation"
+    - "shadow_hand_left_fingertip_linear_velocity"
+    - "shadow_hand_left_fingertip_angular_velocity"
+    - "shadow_hand_left_fingertip_force"
+    - "shadow_hand_left_position"
+    - "shadow_hand_left_orientation"
+    - "shadow_hand_left_action"
+    - "shadow_hand_right_dof_position"
+    - "shadow_hand_right_dof_velocity"
+    - "shadow_hand_right_dof_force"
+    - "shadow_hand_right_fingertip_position"
+    - "shadow_hand_right_fingertip_orientation"
+    - "shadow_hand_right_fingertip_linear_velocity"
+    - "shadow_hand_right_fingertip_angular_velocity"
+    - "shadow_hand_right_fingertip_force"
+    - "shadow_hand_right_position"
+    - "shadow_hand_right_orientation"
+    - "shadow_hand_right_action"
+    - "object_position"
+    - "object_orientation"
+    - "object_linear_velocity"
+    - "object_angular_velocity"
+    - "goal_position"
+    - "goal_orientation"
+    # - "object_to_goal_orientation"
+    - "object_left_handle_position"
+    - "object_right_handle_position"
   handAgentIndex: "[[0, 1, 2, 3, 4, 5]]"
   asymmetric_observations: False
   successTolerance: 0.1
