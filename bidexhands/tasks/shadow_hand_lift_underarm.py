@@ -360,7 +360,21 @@ class ShadowHandLiftUnderarm(BaseTask):
             "object_right_handle_position": 3,
         }
         observation_space = self.cfg["env"]["observationSpace"]
+        num_observations = sum([observation_mapping[observation] for observation in observation_space])
         
+        self._display_observation_space(observation_space, observation_mapping)
+        
+        # Set number of observations & actions        
+        self.cfg["env"]["numObservations"] = num_observations
+        self.cfg["env"]["numStates"] = num_observations
+        if self.is_multi_agent:
+            self.num_agents = 2
+            self.cfg["env"]["numActions"] = num_shadow_hand_actuated_dofs
+        else:
+            self.num_agents = 1
+            self.cfg["env"]["numActions"] = num_shadow_hand_actuated_dofs * 2
+            
+    def _display_observation_space(self, observation_space, observation_mapping):
         from rich.console import Console
         from rich.table import Table
         
@@ -382,16 +396,6 @@ class ShadowHandLiftUnderarm(BaseTask):
             num_observations += observation_mapping[observation]
             
         console.print(table)
-        
-        # Set number of observations & actions        
-        self.cfg["env"]["numObservations"] = num_observations
-        self.cfg["env"]["numStates"] = num_observations
-        if self.is_multi_agent:
-            self.num_agents = 2
-            self.cfg["env"]["numActions"] = num_shadow_hand_actuated_dofs
-        else:
-            self.num_agents = 1
-            self.cfg["env"]["numActions"] = num_shadow_hand_actuated_dofs * 2
 
     def create_sim(self):
         """
@@ -655,12 +659,12 @@ class ShadowHandLiftUnderarm(BaseTask):
             
         # Set initial root pose
         shadow_hand_left_init_root_pose = gymapi.Transform()
-        shadow_hand_left_init_root_pose.p = gymapi.Vec3(0, -1.25, 0.45)
-        shadow_hand_left_init_root_pose.r = gymapi.Quat.from_euler_zyx(0, 0, 3.14159)
+        shadow_hand_left_init_root_pose.p = gymapi.Vec3(0.9, -1.25, 0.25)
+        shadow_hand_left_init_root_pose.r = gymapi.Quat.from_euler_zyx(0.0, 0.0, np.pi)
         
         shadow_hand_right_init_root_pose = gymapi.Transform()
-        shadow_hand_right_init_root_pose.p = gymapi.Vec3(0, 0.05, 0.45)
-        shadow_hand_right_init_root_pose.r = gymapi.Quat.from_euler_zyx(0.0, 0.0, 0.0)
+        shadow_hand_right_init_root_pose.p = gymapi.Vec3(0.9, 0.05, 0.25)
+        shadow_hand_right_init_root_pose.r = gymapi.Quat.from_euler_zyx(0.0, 0.0, np.pi)
         
         self.shadow_hand_left_init_root_pose = shadow_hand_left_init_root_pose
         self.shadow_hand_right_init_root_pose = shadow_hand_right_init_root_pose
