@@ -330,6 +330,8 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.observation_space = observation_space
         self.observation_mapping = observation_mapping
         
+        self.enable_pointcloud_observation = any(["pointcloud" in tags for _, _, tags in observation_mapping.values()])
+        
         self._display_observation_space(observation_space, observation_mapping)
         
         # Set number of observations & actions        
@@ -511,11 +513,11 @@ class ShadowHandLiftUnderarm(BaseTask):
         # TODO: Set initial positions from config file
         init_arm_dof_positions_left = {
             "shoulder_pan_joint": 0.0, "shoulder_lift_joint": -np.pi + 1.25, "elbow_joint": -2.0,
-            "wrist_1_joint": -np.pi * 3 / 4, "wrist_2_joint": -np.pi / 2, "wrist_3_joint": -np.pi,
+            "wrist_1_joint": -np.pi * 3 / 4, "wrist_2_joint": -np.pi / 2, "wrist_3_joint": 0.0,
         }
         init_arm_dof_positions_right = {
             "shoulder_pan_joint": 0.0, "shoulder_lift_joint": -1.25, "elbow_joint": 2.0,
-            "wrist_1_joint": -np.pi / 4, "wrist_2_joint": np.pi / 2, "wrist_3_joint": -np.pi,
+            "wrist_1_joint": -np.pi / 4, "wrist_2_joint": np.pi / 2, "wrist_3_joint": 0.0,
         }
 
         dof_props_left = self.gym.get_asset_dof_properties(shadow_hand_left_asset)
@@ -659,12 +661,12 @@ class ShadowHandLiftUnderarm(BaseTask):
             
         # Set initial root pose
         shadow_hand_left_init_root_pose = gymapi.Transform()
-        shadow_hand_left_init_root_pose.p = gymapi.Vec3(0.9, -1.2, 0.25)
-        shadow_hand_left_init_root_pose.r = gymapi.Quat.from_euler_zyx(0.0, 0.0, 0.0)
+        shadow_hand_left_init_root_pose.p = gymapi.Vec3(-0.20, -2.00, 0.20)
+        shadow_hand_left_init_root_pose.r = gymapi.Quat.from_euler_zyx(0.0, 0.0, -np.pi / 2)
         
         shadow_hand_right_init_root_pose = gymapi.Transform()
-        shadow_hand_right_init_root_pose.p = gymapi.Vec3(0.9, 0.0, 0.25)
-        shadow_hand_right_init_root_pose.r = gymapi.Quat.from_euler_zyx(0.0, 0.0, np.pi)
+        shadow_hand_right_init_root_pose.p = gymapi.Vec3(-0.20, 0.80, 0.20)
+        shadow_hand_right_init_root_pose.r = gymapi.Quat.from_euler_zyx(0.0, 0.0, -np.pi / 2)
         
         self.shadow_hand_left_init_root_pose = shadow_hand_left_init_root_pose
         self.shadow_hand_right_init_root_pose = shadow_hand_right_init_root_pose
@@ -783,6 +785,10 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.goal_init_pose = goal_init_pose
         self.goal_displacement = gymapi.Vec3(0, 0, 0.4)
         self.goal_displacement_tensor = to_torch([self.goal_displacement.x, self.goal_displacement.y, self.goal_displacement.z], device=self.device)
+        
+    def _create_cameras(self):
+        # TODO: Implement this function for camera creation
+        pass
 
     def _transform_to_tensor(self, transform: gymapi.Transform, with_quaternion: bool = True, with_velocity: bool = True, device: Optional[torch.device] = None):
         """
@@ -1274,6 +1280,7 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.shadow_hand_left_actions = self.actions[:, :self.actions.shape[1] // 2]
         self.shadow_hand_right_actions = self.actions[:, self.actions.shape[1] // 2:]
 
+        # TODO: IK control
         if self.use_relative_control:
             self.cur_targets[:, self.shadow_hand_actuated_dof_indices] = (
                 self.prev_targets[:, self.shadow_hand_actuated_dof_indices] 
@@ -1310,6 +1317,21 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.prev_targets[:, self.shadow_hand_actuated_dof_indices] = self.cur_targets[:, self.shadow_hand_actuated_dof_indices]
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self.cur_targets))
 
+    def _draw_axes(self, positions, orientations, length: float = 0.2):
+        assert positions.ndim == 2 and positions.shape == (self.num_envs, 3)
+        assert orientations.ndim == 2 and orientations.shape == (self.num_envs, 4)
+        
+        x = (positions + quat_apply(orientations, self.x_unit_tensor * length)).detach().cpu().numpy()
+        y = (positions + quat_apply(orientations, self.y_unit_tensor * length)).detach().cpu().numpy()
+        z = (positions + quat_apply(orientations, self.z_unit_tensor * length)).detach().cpu().numpy()
+        
+        positions = positions.detach().cpu().numpy()
+        
+        for i in range(self.num_envs):
+            self.gym.add_lines(self.viewer, self.envs[i], 1, np.concatenate([positions[i], x[i]]), np.array([1, 0, 0], dtype=np.float32))
+            self.gym.add_lines(self.viewer, self.envs[i], 1, np.concatenate([positions[i], y[i]]), np.array([0, 1, 0], dtype=np.float32))
+            self.gym.add_lines(self.viewer, self.envs[i], 1, np.concatenate([positions[i], z[i]]), np.array([0, 0, 1], dtype=np.float32))
+
     def post_physics_step(self):
         """
         The post-processing of the physics step. Compute the observation and reward, and visualize auxiliary 
@@ -1323,65 +1345,18 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.compute_reward(self.actions)
 
         if self.viewer and self.debug_viz:
-            # draw axes on target object
             self.gym.clear_lines(self.viewer)
             self.gym.refresh_rigid_body_state_tensor(self.sim)
+            
+            self._draw_axes(self.goal_root_positions, self.goal_root_orientations)
+            
+            self._draw_axes(self.object_root_positions, self.object_root_orientations)
+            self._draw_axes(self.pot_left_handle_positions, self.object_root_orientations)
+            self._draw_axes(self.pot_right_handle_positions, self.object_root_orientations)
+            
+            self._draw_axes(self.shadow_hand_left_positions, self.shadow_hand_left_orientations)
+            self._draw_axes(self.shadow_hand_right_positions, self.shadow_hand_right_orientations)
 
-            for i in range(self.num_envs):
-                # targetx = (self.goal_pos[i] + quat_apply(self.goal_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # targety = (self.goal_pos[i] + quat_apply(self.goal_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # targetz = (self.goal_pos[i] + quat_apply(self.goal_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                # p0 = self.goal_pos[i].cpu().numpy() + self.goal_displacement_tensor.cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], targetx[0], targetx[1], targetx[2]], [0.85, 0.1, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], targety[0], targety[1], targety[2]], [0.1, 0.85, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], targetz[0], targetz[1], targetz[2]], [0.1, 0.1, 0.85])
-
-                # objectx = (self.object_pos[i] + quat_apply(self.object_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # objecty = (self.object_pos[i] + quat_apply(self.object_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # objectz = (self.object_pos[i] + quat_apply(self.object_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                # p0 = self.object_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], objectx[0], objectx[1], objectx[2]], [0.85, 0.1, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], objecty[0], objecty[1], objecty[2]], [0.1, 0.85, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], objectz[0], objectz[1], objectz[2]], [0.1, 0.1, 0.85])
-
-                pot_left_handle_posx = (self.pot_left_handle_pos[i] + quat_apply(self.object_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                pot_left_handle_posy = (self.pot_left_handle_pos[i] + quat_apply(self.object_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                pot_left_handle_posz = (self.pot_left_handle_pos[i] + quat_apply(self.object_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                p0 = self.pot_left_handle_pos[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pot_left_handle_posx[0], pot_left_handle_posx[1], pot_left_handle_posx[2]], [0.85, 0.1, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pot_left_handle_posy[0], pot_left_handle_posy[1], pot_left_handle_posy[2]], [0.1, 0.85, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pot_left_handle_posz[0], pot_left_handle_posz[1], pot_left_handle_posz[2]], [0.1, 0.1, 0.85])
-                
-                pot_right_handle_posx = (self.pot_right_handle_pos[i] + quat_apply(self.object_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                pot_right_handle_posy = (self.pot_right_handle_pos[i] + quat_apply(self.object_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                pot_right_handle_posz = (self.pot_right_handle_pos[i] + quat_apply(self.object_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                p0 = self.pot_right_handle_pos[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pot_right_handle_posx[0], pot_right_handle_posx[1], pot_right_handle_posx[2]], [0.85, 0.1, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pot_right_handle_posy[0], pot_right_handle_posy[1], pot_right_handle_posy[2]], [0.1, 0.85, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pot_right_handle_posz[0], pot_right_handle_posz[1], pot_right_handle_posz[2]], [0.1, 0.1, 0.85])
-
-                left_hand_posx = (self.left_hand_pos[i] + quat_apply(self.left_hand_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                left_hand_posy = (self.left_hand_pos[i] + quat_apply(self.left_hand_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                left_hand_posz = (self.left_hand_pos[i] + quat_apply(self.left_hand_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                p0 = self.left_hand_pos[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], left_hand_posx[0], left_hand_posx[1], left_hand_posx[2]], [0.85, 0.1, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], left_hand_posy[0], left_hand_posy[1], left_hand_posy[2]], [0.1, 0.85, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], left_hand_posz[0], left_hand_posz[1], left_hand_posz[2]], [0.1, 0.1, 0.85])
-
-                right_hand_posx = (self.right_hand_pos[i] + quat_apply(self.right_hand_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                right_hand_posy = (self.right_hand_pos[i] + quat_apply(self.right_hand_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                right_hand_posz = (self.right_hand_pos[i] + quat_apply(self.right_hand_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                p0 = self.right_hand_pos[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], right_hand_posx[0], right_hand_posx[1], right_hand_posx[2]], [0.85, 0.1, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], right_hand_posy[0], right_hand_posy[1], right_hand_posy[2]], [0.1, 0.85, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], right_hand_posz[0], right_hand_posz[1], right_hand_posz[2]], [0.1, 0.1, 0.85])
-    
     def rand_row(self, tensor, dim_needed):  
         row_total = tensor.shape[0]
         return tensor[torch.randint(low=0, high=row_total, size=(dim_needed,)),:]
