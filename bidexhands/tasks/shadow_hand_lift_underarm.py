@@ -289,43 +289,46 @@ class ShadowHandLiftUnderarm(BaseTask):
         num_shadow_hand_dofs = 30
         num_shadow_hand_actuated_dofs = 26
         num_fingertips = 5
-        
-        # TODO: split into separate sections
+
         observation_mapping = {
-            "shadow_hand_left_dof_position": num_shadow_hand_dofs,
-            "shadow_hand_left_dof_velocity": num_shadow_hand_dofs,
-            "shadow_hand_left_dof_force": num_shadow_hand_dofs,
-            "shadow_hand_left_fingertip_position": num_fingertips * 3,
-            "shadow_hand_left_fingertip_orientation": num_fingertips * 4,
-            "shadow_hand_left_fingertip_linear_velocity": num_fingertips * 3,
-            "shadow_hand_left_fingertip_angular_velocity": num_fingertips * 3,
-            "shadow_hand_left_fingertip_force": num_fingertips * 6,
-            "shadow_hand_left_position": 3,
-            "shadow_hand_left_orientation": 4,
-            "shadow_hand_left_action": num_shadow_hand_actuated_dofs,
-            "shadow_hand_right_dof_position": num_shadow_hand_dofs,
-            "shadow_hand_right_dof_velocity": num_shadow_hand_dofs,
-            "shadow_hand_right_dof_force": num_shadow_hand_dofs,
-            "shadow_hand_right_fingertip_position": num_fingertips * 3,
-            "shadow_hand_right_fingertip_orientation": num_fingertips * 4,
-            "shadow_hand_right_fingertip_linear_velocity": num_fingertips * 3,
-            "shadow_hand_right_fingertip_angular_velocity": num_fingertips * 3,
-            "shadow_hand_right_fingertip_force": num_fingertips * 6,
-            "shadow_hand_right_position": 3,
-            "shadow_hand_right_orientation": 4,
-            "shadow_hand_right_action": num_shadow_hand_actuated_dofs,
-            "object_position": 3,
-            "object_orientation": 4,
-            "object_linear_velocity": 3,
-            "object_angular_velocity": 3,
-            "goal_position": 3,
-            "goal_orientation": 4,
-            "object_to_goal_orientation": 4,
-            "object_left_handle_position": 3,
-            "object_right_handle_position": 3,
+            "shadow_hand_left_dof_position": (num_shadow_hand_dofs, "shadow_hand_left_dof_positions", ("dof", "position")),
+            "shadow_hand_left_dof_velocity": (num_shadow_hand_dofs, "shadow_hand_left_dof_velocities", ("dof", "velocity")),
+            "shadow_hand_left_dof_force": (num_shadow_hand_dofs, "shadow_hand_left_dof_forces", ("dof", "force")),
+            "shadow_hand_left_fingertip_position": (num_fingertips * 3, "fingertip_left_positions", ("fingertip", "position")),
+            "shadow_hand_left_fingertip_orientation": (num_fingertips * 4, "fingertip_left_orientations", ("fingertip", "orientation")),
+            "shadow_hand_left_fingertip_linear_velocity": (num_fingertips * 3, "fingertip_left_linear_velocities", ("fingertip", "linear_velocity")),
+            "shadow_hand_left_fingertip_angular_velocity": (num_fingertips * 3, "fingertip_left_angular_velocities", ("fingertip", "angular_velocity")),
+            "shadow_hand_left_fingertip_force": (num_fingertips * 6, "fingertip_left_force_sensor_states", ("fingertip", "force")),
+            "shadow_hand_left_position": (3, "shadow_hand_left_positions", ("position",)),
+            "shadow_hand_left_orientation": (4, "shadow_hand_left_orientations", ("orientation",)),
+            "shadow_hand_left_action": (num_shadow_hand_actuated_dofs, "shadow_hand_left_actions", ("action",)),
+            "shadow_hand_right_dof_position": (num_shadow_hand_dofs, "shadow_hand_right_dof_positions", ("dof", "position")),
+            "shadow_hand_right_dof_velocity": (num_shadow_hand_dofs, "shadow_hand_right_dof_velocities", ("dof", "velocity")),
+            "shadow_hand_right_dof_force": (num_shadow_hand_dofs, "shadow_hand_right_dof_forces", ("dof", "force")),
+            "shadow_hand_right_fingertip_position": (num_fingertips * 3, "fingertip_right_positions", ("fingertip", "position")),
+            "shadow_hand_right_fingertip_orientation": (num_fingertips * 4, "fingertip_right_orientations", ("fingertip", "orientation")),
+            "shadow_hand_right_fingertip_linear_velocity": (num_fingertips * 3, "fingertip_right_linear_velocities", ("fingertip", "linear_velocity")),
+            "shadow_hand_right_fingertip_angular_velocity": (num_fingertips * 3, "fingertip_right_angular_velocities", ("fingertip", "angular_velocity")),
+            "shadow_hand_right_fingertip_force": (num_fingertips * 6, "fingertip_right_force_sensor_states", ("fingertip", "force")),
+            "shadow_hand_right_position": (3, "shadow_hand_right_positions", ("position",)),
+            "shadow_hand_right_orientation": (4, "shadow_hand_right_orientations", ("orientation",)),
+            "shadow_hand_right_action": (num_shadow_hand_actuated_dofs, "shadow_hand_right_actions", ("action",)),
+            "object_position": (3, "object_root_positions", ("position",)),
+            "object_orientation": (4, "object_root_orientations", ("orientation",)),
+            "object_linear_velocity": (3, "object_root_linear_velocities", ("linear_velocity",)),
+            "object_angular_velocity": (3, "object_root_angular_velocities", ("angular_velocity",)),
+            "goal_position": (3, "goal_root_positions", ("position",)),
+            "goal_orientation": (4, "goal_root_orientations", ("orientation",)),
+            "object_to_goal_orientation": (4, "object_to_goal_orientation", ("orientation",)),
+            "object_left_handle_position": (3, "pot_left_handle_positions", ("position",)),
+            "object_right_handle_position": (3, "pot_right_handle_positions", ("position",)),
         }
+
         observation_space = self.cfg["env"]["observationSpace"]
-        num_observations = sum([observation_mapping[observation] for observation in observation_space])
+        num_observations = sum([observation_mapping[observation][0] for observation in observation_space])
+        
+        self.observation_space = observation_space
+        self.observation_mapping = observation_mapping
         
         self._display_observation_space(observation_space, observation_mapping)
         
@@ -338,7 +341,26 @@ class ShadowHandLiftUnderarm(BaseTask):
         else:
             self.num_agents = 1
             self.cfg["env"]["numActions"] = num_shadow_hand_actuated_dofs * 2
+
+    def _pack_observations(self):
+        observations = []
+        for name in self.observation_space:
+            num_dim, attr_name, tags = self.observation_mapping[name]
+            observation = getattr(self, attr_name)
             
+            if "dof" in tags and "position" in tags:
+                observation = unscale(observation, self.shadow_hand_dof_lower_limits, self.shadow_hand_dof_upper_limits)
+            if "dof" in tags and "force" in tags:
+                observation = observation * self.force_torque_obs_scale
+            if "dof" in tags and "velocity" in tags:
+                observation = observation * self.vel_obs_scale
+            if "angular_velocity" in tags:
+                observation = observation * self.vel_obs_scale
+            
+            observations.append(observation.reshape(self.num_envs, num_dim))
+        
+        return torch.cat(observations, dim=-1)
+
     def _display_observation_space(self, observation_space, observation_mapping):
         from rich.console import Console
         from rich.table import Table
@@ -349,16 +371,19 @@ class ShadowHandLiftUnderarm(BaseTask):
         table.add_column("Size")
         table.add_column("Start")
         table.add_column("End")
+        table.add_column("Tags")
         
         num_observations = 0
         for observation in observation_space:
+            num_dim, _, tags = observation_mapping[observation]
             table.add_row(
                 observation, 
-                str(observation_mapping[observation]), 
+                str(num_dim), 
                 str(num_observations), 
-                str(num_observations + observation_mapping[observation]),
+                str(num_observations + num_dim),
+                ", ".join(tags) if tags else ""
             )
-            num_observations += observation_mapping[observation]
+            num_observations += num_dim
             
         console.print(table)
 
@@ -1085,50 +1110,7 @@ class ShadowHandLiftUnderarm(BaseTask):
             self.compute_full_state(True)
 
     def compute_full_state(self, asymm_obs=False):
-        # TODO: compute current full-state from observation space config
-        shadow_hand_left_dof_positions = unscale(
-            self.shadow_hand_left_dof_positions, 
-            self.shadow_hand_dof_lower_limits, 
-            self.shadow_hand_dof_upper_limits,
-        )
-        shadow_hand_right_dof_positions = unscale(
-            self.shadow_hand_right_dof_positions,
-            self.shadow_hand_dof_lower_limits,
-            self.shadow_hand_dof_upper_limits,
-        )
-        
-        self.obs_buf[:] = torch.cat(
-            [
-                shadow_hand_left_dof_positions,
-                self.shadow_hand_left_dof_velocities * self.vel_obs_scale,
-                self.shadow_hand_left_dof_forces * self.force_torque_obs_scale,
-                self.fingertip_left_states.reshape(self.num_envs, -1),
-                self.fingertip_left_force_sensor_states.reshape(self.num_envs, -1),
-                self.shadow_hand_left_positions,
-                self.shadow_hand_left_orientations,
-                self.actions[:, :self.actions.shape[1] // 2],
-                
-                shadow_hand_right_dof_positions,
-                self.shadow_hand_right_dof_velocities * self.vel_obs_scale,
-                self.shadow_hand_right_dof_forces * self.force_torque_obs_scale,
-                self.fingertip_right_states.reshape(self.num_envs, -1),
-                self.fingertip_right_force_sensor_states.reshape(self.num_envs, -1),
-                self.shadow_hand_right_positions,
-                self.shadow_hand_right_orientations,
-                self.actions[:, self.actions.shape[1] // 2:],
-                
-                self.object_root_positions,
-                self.object_root_orientations,
-                self.object_root_linear_velocities,
-                self.object_root_angular_velocities * self.vel_obs_scale,
-                
-                self.goal_root_positions,
-                self.goal_root_orientations,
-                self.pot_left_handle_positions,
-                self.pot_right_handle_positions,
-            ],
-            dim=-1,
-        )
+        self.obs_buf[:] = self._pack_observations()
 
     def compute_point_cloud_observation(self, collect_demonstration=False):
         pass
@@ -1289,6 +1271,8 @@ class ShadowHandLiftUnderarm(BaseTask):
             self.reset(env_ids, goal_env_ids)
 
         self.actions = actions.clone().to(self.device)
+        self.shadow_hand_left_actions = self.actions[:, :self.actions.shape[1] // 2]
+        self.shadow_hand_right_actions = self.actions[:, self.actions.shape[1] // 2:]
 
         if self.use_relative_control:
             self.cur_targets[:, self.shadow_hand_actuated_dof_indices] = (
@@ -1298,12 +1282,12 @@ class ShadowHandLiftUnderarm(BaseTask):
         else:
             assert self.actions.shape[1] == len(self.shadow_hand_actuated_dof_indices)
             self.cur_targets[:, self.shadow_hand_left_actuated_dof_indices] = scale(
-                self.actions[:, :self.actions.shape[1] // 2],
+                self.shadow_hand_left_actions,
                 self.shadow_hand_dof_lower_limits[self.actuated_dof_indices],
                 self.shadow_hand_dof_upper_limits[self.actuated_dof_indices],
             )
             self.cur_targets[:, self.shadow_hand_right_actuated_dof_indices] = scale(
-                self.actions[:, self.actions.shape[1] // 2:],
+                self.shadow_hand_right_actions,
                 self.shadow_hand_dof_lower_limits[self.actuated_dof_indices],
                 self.shadow_hand_dof_upper_limits[self.actuated_dof_indices],
             )
