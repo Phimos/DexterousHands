@@ -331,7 +331,7 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.observation_mapping = observation_mapping
         
         self.enable_pointcloud_observation = any(["pointcloud" in tags for _, _, tags in observation_mapping.values()])
-        
+                
         self._display_observation_space(observation_space, observation_mapping)
         
         # Set number of observations & actions        
@@ -788,7 +788,17 @@ class ShadowHandLiftUnderarm(BaseTask):
         
     def _create_cameras(self):
         # TODO: Implement this function for camera creation
-        pass
+        if not self.enable_pointcloud_observation:
+            return
+        
+        self.cameras = []
+        self.camera_transforms = []
+        
+        self.camera_properties = gymapi.CameraProperties()
+        self.camera_properties.width = 640
+        self.camera_properties.height = 480
+        self.camera_properties.enable_tensors = True
+        print(self.camera_properties)
 
     def _transform_to_tensor(self, transform: gymapi.Transform, with_quaternion: bool = True, with_velocity: bool = True, device: Optional[torch.device] = None):
         """
@@ -827,6 +837,7 @@ class ShadowHandLiftUnderarm(BaseTask):
         self._create_table()
         self._create_object()
         self._create_goal()
+        self._create_cameras()
 
         # Compute aggregate size
         # - shadow-hand-left    : self.num_shadow_hand_*
@@ -846,8 +857,6 @@ class ShadowHandLiftUnderarm(BaseTask):
         object_indices = []
         goal_indices = []
         table_indices = []
-        
-        self.fingertip_indices = []
 
         if self.obs_type in ["point_cloud"]:
             self.cameras = []
@@ -943,6 +952,21 @@ class ShadowHandLiftUnderarm(BaseTask):
                 self.camera_view_matrixs.append(cam_vinv)
                 self.camera_proj_matrixs.append(cam_proj)
                 self.cameras.append(camera_handle)
+                
+            if self.enable_pointcloud_observation:
+                camera = self.gym.create_camera_sensor(env, self.camera_properties)
+                self.gym.set_camera_location(camera, env, gymapi.Vec3(0.25, -0.57, 0.75), gymapi.Vec3(-0.24, -0.57, 0.25))
+                image = self.gym.get_camera_image_gpu_tensor(self.sim, env, camera, gymapi.IMAGE_DEPTH)
+                image = gymtorch.wrap_tensor(image)
+                
+                view_matrix = self.gym.get_camera_view_matrix(self.sim, env, camera)
+                proj_matrix = self.gym.get_camera_proj_matrix(self.sim, env, camera)
+                
+                print("view_matrix: ", view_matrix.shape)
+                print(view_matrix)
+                print("proj_matrix: ", proj_matrix.shape)
+                print(proj_matrix)
+                print("image: ", image.shape)
 
             if self.aggregate_mode > 0:
                 self.gym.end_aggregate(env)
@@ -1393,6 +1417,29 @@ class ShadowHandLiftUnderarm(BaseTask):
 #####################################################################
 ###=========================jit functions=========================###
 #####################################################################
+
+
+def pointcloud_from_depth(image, view_matrix, projection_matrix):
+    # TODO: test this function
+    # TODO: add support for batched inputs
+    height, width = image.shape
+    vinv = torch.inverse(view_matrix)
+    
+    fu, fv = 2 / projection_matrix[0, 0], 2 / projection_matrix[1, 1]
+    cu, cv = width / 2, height / 2
+    
+    ii = torch.arange(0, width, device=image.device).reshape(1, -1).repeat(height, 1)
+    jj = torch.arange(0, height, device=image.device).reshape(-1, 1).repeat(1, width)
+    
+    u = - (ii - cu) / width * image * fu
+    v = (jj - cv) / height * image * fv
+    z = image
+    
+    pointcloud = torch.stack([u, v, z], dim=-1)
+    pointcloud = pointcloud.reshape(-1, 3)
+    pointcloud = torch.matmul(pointcloud, vinv[:3, :3].t()) + vinv[:3, 3]
+    return pointcloud
+    
 
 @torch.jit.script
 def depth_image_to_point_cloud_GPU(camera_tensor, camera_view_matrix_inv, camera_proj_matrix, u, v, width:float, height:float, depth_bar:float, device:torch.device):
