@@ -5,8 +5,6 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-from unittest import TextTestRunner
-from matplotlib.pyplot import axis
 from PIL import Image as Im
 from typing import Optional, Sequence
 
@@ -401,13 +399,6 @@ class ShadowHandLiftUnderarm(BaseTask):
         self._create_ground_plane()
         self._create_envs(self.num_envs, self.cfg["env"]['envSpacing'], int(np.sqrt(self.num_envs)))
 
-    def _create_ground_plane(self):
-        """Creates the ground plane for the simulation
-        """
-        plane_params = gymapi.PlaneParams()
-        plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
-        self.gym.add_ground(self.sim, plane_params)
-
     def _display_dof_properties(self, asset: gymapi.Asset, properties: np.ndarray):
         """Displays the DoF properties of the asset in a rich table
 
@@ -433,7 +424,77 @@ class ShadowHandLiftUnderarm(BaseTask):
             table.add_row(*item)
 
         console.print(table)
+
+    def _random_colorize(self, env: gymapi.Env, shadow_hand_actor: int, shadow_hand_side: str, part_level: bool = False):
+        """Randomly colorize the shadow hand.
+
+        Args:
+            env (gymapi.Env): IsaacGym environment handle.
+            shadow_hand_actor (int): Shadow hand actor handle.
+            shadow_hand_side (str): Shadow hand side ("left" or "right").
+            part_level (bool, optional): Whether to colorize at part level. Defaults to False.
+        """
+        assert shadow_hand_side in ["left", "right"]
+        prefix = "lh_" if shadow_hand_side == "left" else "rh_"
         
+        colorization_groups = [
+            ["base_link", "shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link"],
+            ["wrist", "palm"],
+            ["ffknuckle", "ffproximal", "ffmiddle", "ffdistal"],
+            ["lfmetacarpal", "lfknuckle", "lfproximal", "lfmiddle", "lfdistal"],
+            ["mfknuckle", "mfproximal", "mfmiddle", "mfdistal"],
+            ["rfknuckle", "rfproximal", "rfmiddle", "rfdistal"],
+            ["thbase", "thproximal", "thhub", "thmiddle", "thdistal"]
+        ]
+        
+        for i, group in enumerate(colorization_groups):
+            if i == 0:
+                continue
+            for j in range(len(group)):
+                group[j] = prefix + group[j]
+        
+        color = gymapi.Vec3(random.random(), random.random(), random.random())
+        for i, group in enumerate(colorization_groups):
+            if part_level:
+                color = gymapi.Vec3(random.random(), random.random(), random.random())
+            for link in group:
+                self.gym.set_rigid_body_color(
+                    env, 
+                    shadow_hand_actor, 
+                    self.gym.find_actor_rigid_body_index(env, shadow_hand_actor, link, gymapi.DOMAIN_ACTOR),
+                    gymapi.MESH_VISUAL, 
+                    color
+                )
+
+    def _transform_to_tensor(self, transform: gymapi.Transform, with_quaternion: bool = True, with_velocity: bool = True, device: Optional[torch.device] = None) -> torch.Tensor:
+        """Transform `gymapi.Transform` to `torch.Tensor`
+        """
+        device = self.device if device is None else device
+        
+        position = [transform.p.x, transform.p.y, transform.p.z]
+        quaternion = [transform.r.x, transform.r.y, transform.r.z, transform.r.w]
+        velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        
+        if with_quaternion and with_velocity:
+            return torch.tensor(position + quaternion + velocity, dtype=torch.float32, device=device)
+        elif with_quaternion and not with_velocity:
+            return torch.tensor(position + quaternion, dtype=torch.float32, device=device)
+        elif not with_quaternion and not with_velocity:
+            return torch.tensor(position, dtype=torch.float32, device=device)
+        else:
+            raise NotImplementedError
+
+    """
+    Functions - create assets
+    """
+    
+    def _create_ground_plane(self):
+        """Creates the ground plane for the simulation
+        """
+        plane_params = gymapi.PlaneParams()
+        plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
+        self.gym.add_ground(self.sim, plane_params)
+    
     def _create_robots(self):
         asset_root = "../assets"
         
@@ -685,47 +746,6 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.shadow_hand_left_center_asset_index = self.gym.find_asset_rigid_body_index(shadow_hand_left_asset, f"lh_{self.hand_center}")
         self.shadow_hand_right_center_asset_index = self.gym.find_asset_rigid_body_index(shadow_hand_right_asset, f"rh_{self.hand_center}")
 
-    def _random_colorize(self, env: gymapi.Env, shadow_hand_actor: int, shadow_hand_side: str, part_level: bool = False):
-        """Randomly colorize the shadow hand.
-
-        Args:
-            env (gymapi.Env): IsaacGym environment handle.
-            shadow_hand_actor (int): Shadow hand actor handle.
-            shadow_hand_side (str): Shadow hand side ("left" or "right").
-            part_level (bool, optional): Whether to colorize at part level. Defaults to False.
-        """
-        assert shadow_hand_side in ["left", "right"]
-        prefix = "lh_" if shadow_hand_side == "left" else "rh_"
-        
-        colorization_groups = [
-            ["base_link", "shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link"],
-            ["wrist", "palm"],
-            ["ffknuckle", "ffproximal", "ffmiddle", "ffdistal"],
-            ["lfmetacarpal", "lfknuckle", "lfproximal", "lfmiddle", "lfdistal"],
-            ["mfknuckle", "mfproximal", "mfmiddle", "mfdistal"],
-            ["rfknuckle", "rfproximal", "rfmiddle", "rfdistal"],
-            ["thbase", "thproximal", "thhub", "thmiddle", "thdistal"]
-        ]
-        
-        for i, group in enumerate(colorization_groups):
-            if i == 0:
-                continue
-            for j in range(len(group)):
-                group[j] = prefix + group[j]
-        
-        color = gymapi.Vec3(random.random(), random.random(), random.random())
-        for i, group in enumerate(colorization_groups):
-            if part_level:
-                color = gymapi.Vec3(random.random(), random.random(), random.random())
-            for link in group:
-                self.gym.set_rigid_body_color(
-                    env, 
-                    shadow_hand_actor, 
-                    self.gym.find_actor_rigid_body_index(env, shadow_hand_actor, link, gymapi.DOMAIN_ACTOR),
-                    gymapi.MESH_VISUAL, 
-                    color
-                )
-
     def _create_table(self):
         table_texture_filepath = "../assets/textures/texture_stone_stone_texture_0.jpg"
         table_texture = self.gym.create_texture_from_file(self.sim, table_texture_filepath)
@@ -768,7 +788,7 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.object_asset = object_asset
         self.object_init_pose = object_init_pose
         
-    def _create_goal(self):
+    def _create_goal_object(self):
         asset_root = "../assets"
         object_asset_file = "mjcf/pot/mobility.urdf"
         
@@ -800,25 +820,6 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.camera_properties.enable_tensors = True
         print(self.camera_properties)
 
-    def _transform_to_tensor(self, transform: gymapi.Transform, with_quaternion: bool = True, with_velocity: bool = True, device: Optional[torch.device] = None):
-        """
-        Transform gymapi.Transform to torch.tensor
-        """
-        device = self.device if device is None else device
-        
-        position = [transform.p.x, transform.p.y, transform.p.z]
-        quaternion = [transform.r.x, transform.r.y, transform.r.z, transform.r.w]
-        velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        
-        if with_quaternion and with_velocity:
-            return to_torch(position + quaternion + velocity, device=device, dtype=torch.float)
-        elif with_quaternion and not with_velocity:
-            return to_torch(position + quaternion, device=device, dtype=torch.float)
-        elif not with_quaternion and not with_velocity:
-            return to_torch(position, device=device, dtype=torch.float)
-        else:
-            raise NotImplementedError
-
     def _create_envs(self, num_envs, spacing, num_per_row):
         """
         Create multiple parallel isaacgym environments
@@ -836,7 +837,7 @@ class ShadowHandLiftUnderarm(BaseTask):
         self._create_robots()
         self._create_table()
         self._create_object()
-        self._create_goal()
+        self._create_goal_object()
         self._create_cameras()
 
         # Compute aggregate size
@@ -1131,6 +1132,9 @@ class ShadowHandLiftUnderarm(BaseTask):
         # self.fingertip_another_state = self.rigid_body_states[:, self.fingertip_another_handles][:, :, 0:13]
         # self.fingertip_another_pos = self.rigid_body_states[:, self.fingertip_another_handles][:, :, 0:3]
 
+        # TODO: point-cloud observation and state-based observation should in one single pipeline
+        
+        # TODO: should only have one `compute_observations` function
         if self.obs_type == "full_state":
             self.compute_full_state()
         elif self.obs_type == "point_cloud":
@@ -1287,6 +1291,10 @@ class ShadowHandLiftUnderarm(BaseTask):
         Args:
             actions (tensor): Actions of agents in the all environment 
         """
+        # TODO: the FF/MF/RF/LF J2 and J1 should share 1 dof
+        # TODO: the range of this dof should be [0, \pi]
+        # TODO: value_J2 = min(dof, \pi / 2)
+        # TODO: value_J1 = max(dof - \pi / 2, 0)
         env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         goal_env_ids = self.reset_goal_buf.nonzero(as_tuple=False).squeeze(-1)
 
@@ -1341,7 +1349,7 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.prev_targets[:, self.shadow_hand_actuated_dof_indices] = self.cur_targets[:, self.shadow_hand_actuated_dof_indices]
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self.cur_targets))
 
-    def _draw_axes(self, positions, orientations, length: float = 0.2):
+    def _draw_axes(self, positions: torch.Tensor, orientations: torch.Tensor, length: float = 0.2):
         assert positions.ndim == 2 and positions.shape == (self.num_envs, 3)
         assert orientations.ndim == 2 and orientations.shape == (self.num_envs, 4)
         
@@ -1562,11 +1570,11 @@ def compute_hand_reward(
     # Total reward is: position distance + orientation alignment + action regularization + success bonus + fall penalty
     # reward = torch.exp(-0.05*(up_rew * dist_reward_scale)) + torch.exp(-0.05*(right_hand_dist_rew * dist_reward_scale)) + torch.exp(-0.05*(left_hand_dist_rew * dist_reward_scale))
     up_rew = torch.zeros_like(right_hand_dist_rew)
-    up_rew = torch.where(right_hand_dist < 0.08,
-                        torch.where(left_hand_dist < 0.08,
+    up_rew = torch.where(right_hand_dist < 0.28,
+                        torch.where(left_hand_dist < 0.28,
                                         3*(0.385 - goal_dist), up_rew), up_rew)
     
-    reward = 0.2 - right_hand_dist_rew - left_hand_dist_rew + up_rew
+    reward = 0.5 - right_hand_dist_rew - left_hand_dist_rew + up_rew
 
     resets = torch.where(object_pos[:, 2] <= 0.3, torch.ones_like(reset_buf), reset_buf)
     resets = torch.where(right_hand_dist >= 0.5, torch.ones_like(resets), resets)
