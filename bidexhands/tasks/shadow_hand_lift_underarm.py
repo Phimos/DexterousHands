@@ -249,15 +249,6 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.shadow_hand_right_dof_forces = dof_forces[:, self.shadow_hand_right_dof_start:self.shadow_hand_right_dof_end]
         
         rigid_body_states = self.rigid_body_states.view(self.num_envs, self.num_rigid_bodies, 13)
-        self.shadow_hand_left_positions = rigid_body_states[:, self.shadow_hand_left_center_index, :3]
-        self.shadow_hand_left_orientations = rigid_body_states[:, self.shadow_hand_left_center_index, 3:7]
-        self.shadow_hand_left_linear_velocities = rigid_body_states[:, self.shadow_hand_left_center_index, 7:10]
-        self.shadow_hand_left_angular_velocities = rigid_body_states[:, self.shadow_hand_left_center_index, 10:13]
-        
-        self.shadow_hand_right_positions = rigid_body_states[:, self.shadow_hand_right_center_index, :3]
-        self.shadow_hand_right_orientations = rigid_body_states[:, self.shadow_hand_right_center_index, 3:7]
-        self.shadow_hand_right_linear_velocities = rigid_body_states[:, self.shadow_hand_right_center_index, 7:10]
-        self.shadow_hand_right_angular_velocities = rigid_body_states[:, self.shadow_hand_right_center_index, 10:13]
         
         force_sensor_states = self.force_sensor_states.view(self.num_envs, 2, self.num_force_sensors // 2, 6)
         self.fingertip_left_force_sensor_states = force_sensor_states[:, 0, :, :]
@@ -1077,6 +1068,21 @@ class ShadowHandLiftUnderarm(BaseTask):
         self.gym.refresh_force_sensor_tensor(self.sim)
 
         rigid_body_states = self.rigid_body_states.view(self.num_envs, self.num_rigid_bodies, 13)
+        self.shadow_hand_left_positions = rigid_body_states[:, self.shadow_hand_left_center_index, :3]
+        self.shadow_hand_left_orientations = rigid_body_states[:, self.shadow_hand_left_center_index, 3:7]
+        self.shadow_hand_left_linear_velocities = rigid_body_states[:, self.shadow_hand_left_center_index, 7:10]
+        self.shadow_hand_left_angular_velocities = rigid_body_states[:, self.shadow_hand_left_center_index, 10:13]
+        
+        self.shadow_hand_right_positions = rigid_body_states[:, self.shadow_hand_right_center_index, :3]
+        self.shadow_hand_right_orientations = rigid_body_states[:, self.shadow_hand_right_center_index, 3:7]
+        self.shadow_hand_right_linear_velocities = rigid_body_states[:, self.shadow_hand_right_center_index, 7:10]
+        self.shadow_hand_right_angular_velocities = rigid_body_states[:, self.shadow_hand_right_center_index, 10:13]
+
+        self.shadow_hand_left_positions = self.shadow_hand_left_positions + quat_apply(self.shadow_hand_left_orientations, to_torch([0, 0, 1], device=self.device).repeat(self.num_envs, 1) * 0.08)
+        self.shadow_hand_left_positions = self.shadow_hand_left_positions + quat_apply(self.shadow_hand_left_orientations, to_torch([0, 1, 0], device=self.device).repeat(self.num_envs, 1) * -0.02)
+
+        self.shadow_hand_right_positions = self.shadow_hand_right_positions + quat_apply(self.shadow_hand_right_orientations, to_torch([0, 0, 1], device=self.device).repeat(self.num_envs, 1) * 0.08)
+        self.shadow_hand_right_positions = self.shadow_hand_right_positions + quat_apply(self.shadow_hand_right_orientations, to_torch([0, 1, 0], device=self.device).repeat(self.num_envs, 1) * -0.02)
 
         self.fingertip_left_states = rigid_body_states[:, self.fingertip_left_rigid_body_indices, :]
         self.fingertip_left_positions = self.fingertip_left_states[:, :, :3]
@@ -1570,15 +1576,14 @@ def compute_hand_reward(
     # Total reward is: position distance + orientation alignment + action regularization + success bonus + fall penalty
     # reward = torch.exp(-0.05*(up_rew * dist_reward_scale)) + torch.exp(-0.05*(right_hand_dist_rew * dist_reward_scale)) + torch.exp(-0.05*(left_hand_dist_rew * dist_reward_scale))
     up_rew = torch.zeros_like(right_hand_dist_rew)
-    up_rew = torch.where(right_hand_dist < 0.28,
-                        torch.where(left_hand_dist < 0.28,
-                                        3*(0.385 - goal_dist), up_rew), up_rew)
+    mask = (right_hand_dist < 0.18) & (left_hand_dist < 0.18)
+    up_rew = torch.where(mask, 3 * (0.385 - goal_dist), up_rew)
     
     reward = 0.5 - right_hand_dist_rew - left_hand_dist_rew + up_rew
 
     resets = torch.where(object_pos[:, 2] <= 0.3, torch.ones_like(reset_buf), reset_buf)
-    resets = torch.where(right_hand_dist >= 0.5, torch.ones_like(resets), resets)
-    resets = torch.where(left_hand_dist >= 0.5, torch.ones_like(resets), resets)
+    resets = torch.where(right_hand_dist >= 0.3, torch.ones_like(resets), resets)
+    resets = torch.where(left_hand_dist >= 0.3, torch.ones_like(resets), resets)
 
     # Find out which envs hit the goal and update successes count
     successes = torch.where(successes == 0, 
